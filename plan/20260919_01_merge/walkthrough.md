@@ -84,12 +84,23 @@ Fläche < 0,5 %, Sortierung wiederhergestellt (s.u.).
 - `Window::from_config`-Muster (statt `#[macroquad::main]`) hält
   --scan/--bench fensterlos und xvfb-frei.
 
+## Nachtrag: PGE3-Header vendored, GUI verifiziert
+
+`cpp/third_party/olcPixelGameEngine3.h` (790.014 Bytes, main-Branch) per
+`curl` geladen; `030_pge_app.hpp` gegen die echte API neu geschrieben
+(`draw.FilledRect/Rect/String`, `GetMouse()`, `ScreenSize()`;
+`pge_treemap` nutzt eine ältere API ohne diese Namen). CMake-Target
+`treemap_gui` (X11 + Xi + GL + PNG — PNG nur gelinkt weil der Header-Loader
+es referenziert, App lädt keine Bilder). Befund: unter nacktem `xvfb`
+stirbt PGE3 beim ersten Expose (`_NET_WM_STATE`-Atom ohne WM → BadAtom,
+Exit 1, Host-Level, vor App-Code); mit `openbox` läuft die GUI
+(Exit 124, leere stderr, Screenshot belegt Treemap + HUD bei 49 FPS).
+
 ## Mögliche Erweiterungen
 
 Cushion-Shading (flach wie MVP geblieben); `rayon`-Arm nur bei Beleg;
-CJK-Breiten; PGE3-GUI-Build dort wo der Header existiert
-(`TREEMAP_HAS_PGE3`, `030_pge_app.hpp`); `gen.lisp` auf `090_main.cpp`
-ausweiten (derzeit Core-Header).
+CJK-Breiten; `gen.lisp` auf `090_main.cpp`/`030_pge_app.hpp` ausweiten
+(derzeit Core-Header).
 
 ## Neue Programme für den Docker-Container
 

@@ -13,7 +13,7 @@ die deepwiki-Spalte hält Abfrageschlüssel für später vor.
 | `sbcl` 2.6.0.debian | System | `cpp/gen.lisp`-Lauf | — | — |
 | `cl-cpp-generator2` (Quicklisp-Local) | Tooling | C++-Generierung | `plops/cl-cpp-generator2` | `plops/cl-cpp-generator2` |
 | `cl-ppcre` (Quicklisp) | Tooling | Beispiel-Muster 09 | — | — |
-| PGE3 (`olcPixelGameEngine3`) | NICHT vendored | `030_pge_app.hpp` (gated) | `OneLoneCoder/olcPixelGameEngine3` | `OneLoneCoder/olcPixelGameEngine3` |
+| PGE3 (`olcPixelGameEngine3.h`, 790.014 Bytes, main) | vendored unter `cpp/third_party/` | `treemap_gui` (Draw/String/Input) | `OneLoneCoder/olcPixelGameEngine3` | `OneLoneCoder/olcPixelGameEngine3` |
 
 **Keine neue Cargo-Dep** eingeführt (`rayon` evaluiert, verworfen s.u.).
 Keine Dev-Deps (`criterion`/`tempfile`/`assert_cmd`): Bench via
@@ -39,7 +39,9 @@ PGE3-Header für die optionale GUI-Schale).
 ## Systemseitig (Docker)
 
 Neu installiert: `xvfb`, `libx11-dev`, `libxi-dev`, `libgl1-mesa-dev`,
-`libasound2-dev`, `libxkbcommon0` (Laufzeit für miniquad).
+`libasound2-dev`, `libxkbcommon0` (Laufzeit für miniquad), `libpng-dev`
+(nur Link-Dep des PGE-Headers), `openbox` + `x11-apps` (PGE-Smoke: WM
+gegen BadAtom, `xwd`-Screenshot).
 Aufzunehmen in Container-Images:
 `apt-get install -y xvfb libxkbcommon0 libxi6 libx11-6 libgl1`
 (Laufzeit) bzw. `-dev`-Pendants für Builds.
