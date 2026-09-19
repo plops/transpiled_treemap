@@ -26,3 +26,12 @@ target_link_libraries(core_tests PRIVATE pthread)
 
 enable_testing()
 add_test(NAME core_tests COMMAND core_tests)
+
+# PGE3 GUI (vendored header in third_party/; PNG linked only because the
+# header's image loader references it — the app itself loads no images)
+find_package(X11 REQUIRED COMPONENTS Xi)
+find_package(OpenGL REQUIRED)
+find_package(PNG REQUIRED)
+add_executable(treemap_gui src/095_gui_main.cpp)
+target_include_directories(treemap_gui PRIVATE src third_party)
+target_link_libraries(treemap_gui PRIVATE X11::X11 X11::Xi OpenGL::GL PNG::PNG pthread)

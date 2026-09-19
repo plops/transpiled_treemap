@@ -1,20 +1,11 @@
-// PGE3 GUI shell for the parallel treemap. Needs olcPixelGameEngine3.h,
-// which is NOT vendored here (absent in this container); it compiles where
-// the header exists, e.g. next to pge_treemap's build. The parallel core
-// (010/015/020) is PGE-free and covered by ctest.
-//
-// Wiring (mirrors pge_treemap/source0/src/090_main.cpp):
-//   treemap::pge::TreemapApp app(targetDir);
-//   PGEConfig config{...}; app.Construct(config); app.Start();
-//
-// Scan/layout run on a background std::thread (parallel core); the render
-// thread only swaps a ready snapshot under a mutex, like SharedScanContext.
+// PGE3 GUI shell for the parallel treemap core (010/015/020).
+// API verified against the vendored header (cpp/third_party/).
+// The scan/layout core stays PGE-free; this shell only draws snapshots.
 #pragma once
 
-#ifdef TREEMAP_HAS_PGE3
 #include "olcPixelGameEngine3.h"
 
-#include <memory>
+#include <cstdint>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -25,7 +16,12 @@
 
 namespace treemap::pge {
 
-class TreemapApp : public PixelGameEngine {
+inline olc::Pixel to_pixel(const Color& c) {
+    return olc::Pixel(uint8_t(c.r * 255.0f), uint8_t(c.g * 255.0f), uint8_t(c.b * 255.0f),
+                      uint8_t(c.a * 255.0f));
+}
+
+class TreemapApp : public olc::PixelGameEngine {
   public:
     explicit TreemapApp(fs::path target) : m_target(std::move(target)) {
         sAppName = "PGE3 - Treemap [" + m_target.string() + "]";
@@ -41,7 +37,8 @@ class TreemapApp : public PixelGameEngine {
     bool OnUserCreate() override {
         m_worker = std::thread([this] {
             Node root = scan_tree_parallel(m_target);
-            Rect canvas{0.0f, 36.0f, float(ScreenWidth()), float(ScreenHeight() - 36)};
+            const olc::vi2d screen = ScreenSize();
+            const Rect canvas{0.0f, 36.0f, float(screen.x), float(screen.y - 36)};
             squarify_parallel(root.children, canvas);
             std::lock_guard lock(m_mutex);
             m_ready = std::move(root);
@@ -58,29 +55,50 @@ class TreemapApp : public PixelGameEngine {
                 m_hasNew = false;
             }
         }
-        Clear(Pixel(20, 24, 30));
+        draw.Clear(olc::Pixel(20, 24, 30));
         if (!m_tree.children.empty()) {
             draw_tree(m_tree);
+            const olc::vi2d mp = GetMouse().GetPosition();
+            const Node* hov = find_hover(m_tree, float(mp.x), float(mp.y));
+            std::string header = m_tree.path.string() + ": " + format_bytes(m_tree.size);
+            if (hov != nullptr) {
+                header = hov->path.string() + " (" + format_bytes(hov->size) + ")";
+            }
+            draw.FilledRect({0.0f, 0.0f}, {float(ScreenSize().x), 36.0f},
+                            olc::Pixel(13, 15, 20));
+            draw.String({14.0f, 12.0f}, header, olc::Colour::WHITE, {1.0f, 1.0f});
         } else {
-            DrawString({14, 40}, "Scanning filesystem...", Pixel(160, 160, 160), 2);
+            draw.String({14.0f, 40.0f}, "Scanning filesystem...", olc::Colour::GREY,
+                        {2.0f, 2.0f});
         }
-        DrawRect({0, 0}, {ScreenWidth(), 36}, Pixel(13, 15, 20));
-        DrawString({14, 24}, m_tree.path.string() + ": " + format_bytes(m_tree.size),
-                   Pixel::WHITE, 1);
         return !m_stop;
     }
 
   private:
     void draw_tree(const Node& n) {
         if (n.children.empty()) {
-            const auto& c = n.color;
-            FillRect({int(n.rect.x), int(n.rect.y)}, {int(n.rect.w), int(n.rect.h)},
-                     Pixel(uint8_t(c.r * 255), uint8_t(c.g * 255), uint8_t(c.b * 255)));
-        } else {
-            for (const auto& ch : n.children) {
-                draw_tree(ch);
+            if (n.rect.w >= 1.0f && n.rect.h >= 1.0f) {
+                draw.FilledRect({n.rect.x, n.rect.y}, {n.rect.w, n.rect.h}, to_pixel(n.color));
+            }
+            return;
+        }
+        for (const auto& ch : n.children) {
+            draw_tree(ch);
+        }
+        draw.Rect({n.rect.x, n.rect.y}, {n.rect.w, n.rect.h}, olc::Pixel(0, 0, 0, 160));
+    }
+
+    static const Node* find_hover(const Node& n, float x, float y) {
+        if (x < n.rect.x || y < n.rect.y || x > n.rect.x + n.rect.w ||
+            y > n.rect.y + n.rect.h) {
+            return nullptr;
+        }
+        for (const auto& ch : n.children) {
+            if (const Node* hov = find_hover(ch, x, y); hov != nullptr) {
+                return hov;
             }
         }
+        return &n;
     }
 
     fs::path m_target;
@@ -93,5 +111,3 @@ class TreemapApp : public PixelGameEngine {
 };
 
 } // namespace treemap::pge
-
-#endif // TREEMAP_HAS_PGE3
