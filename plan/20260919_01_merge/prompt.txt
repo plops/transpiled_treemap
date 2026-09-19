@@ -8,7 +8,7 @@ ich hab zwei rust programme die eine treemap anzeigen, um ein verstaendnis der g
 
 das mvp gefaellt mir eigentlich besser. es ist schoen kurz und man muss nicht ueber fonts und text im diagram nachdenken.
 
-mit dieser aufgabe geht es darum das mvp programm so schnell wie moeglich laufen zu lassen. d.h. was parallelisiert werden kann (oder asynchron stattfinden kann) soll parallelisiert und asynchron laufen. du sollst eine parallele version in rust implementieren und mit der seriellen version vergleichen. dies sollte gewaehrleisten, dass du keine fehler einbaust.
+mit dieser aufgabe geht es darum das mvp programm so schnell wie moeglich laufen zu lassen. d.h. was parallelisiert werden kann (oder asynchron stattfinden kann) soll parallelisiert und asynchron laufen. du sollst eine parallele version in rust implementieren und mit der seriellen version vergleichen (benchmarks und output validitaet, nutze einfach das root verzeichnis dieses docker images). dies sollte gewaehrleisten, dass du keine fehler einbaust.
 
 wenn du mit der rust version fertig bist, sollst du diese version nach c++ portieren. versuche die konzepte die rust sicher machen weitestgehend auch in die c++ version zu uebertragen. fuer die ausgabe sollst du pge 3 benutzen. schaue dir dafuer als beispiel das programm in /workspace/src/pge_treemap an. aber nur um die gui wegen. die parallele implementierung soll vom rust prototypen stammen.
 
