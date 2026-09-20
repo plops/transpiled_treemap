@@ -1,2 +1,7 @@
+# Build outputs must never be committed (Rust target/, CMake build dirs).
 /target/
 cpp/build/
+build/
+# Transient editor and backup files.
+*~
+*.known-good
