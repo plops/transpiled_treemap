@@ -34,8 +34,8 @@ graph LR
     A([Startverzeichnis]) --> B[Scan: Dateibaum erheben]
     B --> C[Layout: Squarified Treemap]
     C --> D{Modus?}
-    D -- --scan --> E[Eine Zeile auf stdout]
-    D -- --bench --> F[5 Runden Timing auf stderr]
+    D -- "--scan" --> E[Eine Zeile auf stdout]
+    D -- "--bench" --> F[5 Runden Timing auf stderr]
     D -- GUI --> G[Render-Loop + Hover + Resize]
 ```
 
