@@ -4,6 +4,7 @@
 iter2/target/
 cpp/build/
 build/
+basan/
 iter2/lisp/gen/
 # Transient editor and backup files.
 *~
