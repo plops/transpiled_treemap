@@ -37,6 +37,27 @@ Layout-Zeiten: < 1 ms (Fixture zu klein für Layout-Speedup; Parallel-Layout
 ist Korrektheits-parität, kein Speed-Claim). Äquivalenz: Größen identisch,
 Fläche < 0,5 %, Sortierung wiederhergestellt (s.u.).
 
+## Nachtrag 2: Hover-Fix + C++-Speedup (großer Baum, 100k Dateien)
+
+1. **Hover**: `root.rect` wurde im GUI-Worker nie gesetzt → Hit-Test
+   verwarf alles. Fix eine Zeile (`root.rect = canvas`), `find_hover`
+   public + Unit-Tests (`core_tests`: rechts/links/daneben). Per
+   `xdotool`-Screenshot belegt: Header zeigt
+   `/tmp/bench_tree/d11/f051.bin (1.0 KB)` unter dem Cursor.
+2. **C++-Tempo**: Repro `/workspace/src`: Rust 0,39 s vs. C++ 2,19 s.
+   Ursachen: 3 Stats pro Datei (`status` + `symlink_status` + `size`)
+   und unbegrenzte Thread-Erzeugung. Fixes: `is_symlink/is_directory/
+   is_regular_file` (d_type-Cache → 1 Stat/Datei, strace-belegt 13.421 →
+   6.264), Fan-out-Cap (4×nCPU, atomar) für Scan, Top-Level-only für
+   Layout (unbegrenzt war 5x langsamer als seriell). Cap auch in Rust
+   nachgezogen (0,97x → 1,4x warm).
+3. **Endstand warm-cache** (`/workspace/src`): C++ seriell 0,57 /
+   parallel 0,24 s (2,4x); Rust seriell 0,36 / parallel 0,26 s (1,4x);
+   Layout jeweils ~0,006 → ~0,003 s (2x). C++ seriell bleibt ~1,5x
+   hinter Rust (`std::filesystem`-Overhead); auf dem parallelen Pfad
+   (den die GUI nutzt) Parität. Sanitizer-Builds sind 3–5x langsamer —
+   Bench-Zahlen gelten für sanitize-freie Builds.
+
 ## Testbedingte Änderungen (Befunde mit Fix)
 
 - **Thread-pro-Datei war 12x langsamer** (0.009 s → 0.108 s): Fix —
