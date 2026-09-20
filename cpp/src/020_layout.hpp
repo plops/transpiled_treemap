@@ -97,14 +97,30 @@ inline void squarify(std::vector<Node>& nodes, Rect rect) {
     }
 }
 
-inline void layout_subtree_parallel(Node node, Node& out);
+inline void layout_subtree_parallel(Node node, Node& out, int depth);
 
 inline bool needs_recursion(const Node& n) {
     return n.isDir && !n.children.empty() && n.rect.w > 4.0f && n.rect.h > 4.0f;
 }
 
+inline void squarify_parallel_depth(std::vector<Node>& nodes, Rect rect, int depth);
+
 inline void squarify_parallel(std::vector<Node>& nodes, Rect rect) {
+    squarify_parallel_depth(nodes, rect, 0);
+}
+
+// Fan-out only at the top level: unbounded per-level threads cost more
+// than they saved on large trees (bench: 5x slower than serial).
+inline void squarify_parallel_depth(std::vector<Node>& nodes, Rect rect, int depth) {
     squarify_level(nodes, rect);
+    if (depth > 0) {
+        for (auto& node : nodes) {
+            if (needs_recursion(node)) {
+                squarify_parallel_depth(node.children, node.rect, depth + 1);
+            }
+        }
+        return;
+    }
     std::vector<Node> taken;
     taken.swap(nodes);
     // Leaves need no recursion: only subtrees get a thread. Disjoint indices
@@ -120,7 +136,7 @@ inline void squarify_parallel(std::vector<Node>& nodes, Rect rect) {
     for (size_t k = 0; k < dirIdx.size(); ++k) {
         workers.emplace_back([&, k] {
             Node done;
-            layout_subtree_parallel(std::move(taken[dirIdx[k]]), done);
+            layout_subtree_parallel(std::move(taken[dirIdx[k]]), done, depth);
             taken[dirIdx[k]] = std::move(done);
         });
     }
@@ -133,9 +149,9 @@ inline void squarify_parallel(std::vector<Node>& nodes, Rect rect) {
     nodes = std::move(taken);
 }
 
-inline void layout_subtree_parallel(Node node, Node& out) {
+inline void layout_subtree_parallel(Node node, Node& out, int depth) {
     if (node.isDir && !node.children.empty() && node.rect.w > 4.0f && node.rect.h > 4.0f) {
-        squarify_parallel(node.children, node.rect);
+        squarify_parallel_depth(node.children, node.rect, depth + 1);
     }
     out = std::move(node);
 }

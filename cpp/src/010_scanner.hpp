@@ -84,42 +84,76 @@ inline Node scan_tree(const fs::path& path) {
 }
 
 inline void scan_entry(Node& node, const fs::directory_entry& entry) {
+    // d_type cache: answers from readdir, no extra stat (see parallel path).
     std::error_code ec;
-    const fs::file_status st = entry.status(ec);
+    if (entry.is_symlink(ec)) {
+        return;
+    }
     if (ec) {
         report_skip("file_type", entry.path(), ec);
         return;
     }
-    if (fs::is_symlink(entry.symlink_status(ec))) {
+    const fs::path p = entry.path();
+    const bool isdir = entry.is_directory(ec);
+    if (ec) {
+        report_skip("file_type", p, ec);
         return;
     }
-    const fs::path p = entry.path();
-    if (st.type() == fs::file_type::directory) {
+    if (isdir) {
         Node child = scan_tree(p);
         if (child.size > 0) {
             node.size += child.size;
             node.children.push_back(std::move(child));
         }
-    } else if (st.type() == fs::file_type::regular) {
-        const uintmax_t size = entry.file_size(ec);
-        if (ec) {
-            report_skip("metadata", p, ec);
-            return;
-        }
-        if (size > 0 && size < (uintmax_t{1} << 48)) {
-            Node child;
-            child.path = p;
-            child.size = size;
-            child.isDir = false;
-            child.color = color_for_path(p);
-            node.size += size;
-            node.children.push_back(std::move(child));
-        }
+        return;
+    }
+    const bool isfile = entry.is_regular_file(ec);
+    if (ec) {
+        report_skip("file_type", p, ec);
+        return;
+    }
+    if (!isfile) {
+        return;
+    }
+    const uintmax_t size = entry.file_size(ec);
+    if (ec) {
+        report_skip("metadata", p, ec);
+        return;
+    }
+    if (size > 0 && size < (uintmax_t{1} << 48)) {
+        Node child;
+        child.path = p;
+        child.size = size;
+        child.isDir = false;
+        child.color = color_for_path(p);
+        node.size += size;
+        node.children.push_back(std::move(child));
     }
 }
 
 // Parallel scan: files inline, one thread per subdirectory (owned subtrees).
+// Fan-out is capped: at most ~4x hardware threads scan concurrently, deeper
+// levels recurse inline. Uncapped spawning drowned large trees in threads.
+inline std::atomic<unsigned>& ScanWorkersActive() {
+    static std::atomic<unsigned> active{0};
+    return active;
+}
+
+inline unsigned ScanWorkerLimit() {
+    static const unsigned limit =
+        4u * std::max(2u, std::thread::hardware_concurrency() == 0
+                              ? 2u
+                              : std::thread::hardware_concurrency());
+    return limit;
+}
+
+inline Node scan_tree_parallel_impl(const fs::path& path, int depth);
+
 inline Node scan_tree_parallel(const fs::path& path) {
+    return scan_tree_parallel_impl(path, 0);
+}
+
+inline Node scan_tree_parallel_impl(const fs::path& path, int depth) {
     Node node;
     node.path = path;
     if (IsVirtualRoot(path)) {
@@ -138,45 +172,76 @@ inline Node scan_tree_parallel(const fs::path& path) {
             break;
         }
         const fs::directory_entry& entry = *it;
-        const fs::file_status st = entry.status(ec);
+        // d_type cache: is_symlink/is_directory/is_regular_file answer from
+        // readdir on most filesystems (no extra stat; symlinks are skipped
+        // before any target stat, like Rust's file_type()).
+        bool islink = entry.is_symlink(ec);
         if (ec) {
             report_skip("file_type", entry.path(), ec);
             continue;
         }
-        if (fs::is_symlink(entry.symlink_status(ec))) {
+        if (islink) {
             continue;
         }
         const fs::path p = entry.path();
-        if (st.type() == fs::file_type::directory) {
+        const bool isdir = entry.is_directory(ec);
+        if (ec) {
+            report_skip("file_type", p, ec);
+            continue;
+        }
+        if (isdir) {
             subdirs.push_back(p);
-        } else if (st.type() == fs::file_type::regular) {
-            const uintmax_t size = entry.file_size(ec);
-            if (ec) {
-                report_skip("metadata", p, ec);
-                continue;
-            }
-            if (size > 0 && size < (uintmax_t{1} << 48)) {
-                Node child;
-                child.path = p;
-                child.size = size;
-                child.isDir = false;
-                child.color = color_for_path(p);
-                node.size += size;
-                node.children.push_back(std::move(child));
-            }
+            continue;
+        }
+        const bool isfile = entry.is_regular_file(ec);
+        if (ec) {
+            report_skip("file_type", p, ec);
+            continue;
+        }
+        if (!isfile) {
+            continue;
+        }
+        const uintmax_t size = entry.file_size(ec);
+        if (ec) {
+            report_skip("metadata", p, ec);
+            continue;
+        }
+        if (size > 0 && size < (uintmax_t{1} << 48)) {
+            Node child;
+            child.path = p;
+            child.size = size;
+            child.isDir = false;
+            child.color = color_for_path(p);
+            node.size += size;
+            node.children.push_back(std::move(child));
         }
     }
 
     std::vector<Node> results(subdirs.size());
-    std::vector<std::thread> workers;
-    workers.reserve(subdirs.size());
-    for (size_t i = 0; i < subdirs.size(); ++i) {
-        workers.emplace_back([&, i] {
-            results[i] = scan_tree_parallel(subdirs[i]);
-        });
+    bool fanout = !subdirs.empty() && depth < 64;
+    if (fanout) {
+        const unsigned was = ScanWorkersActive().fetch_add(1);
+        fanout = was < ScanWorkerLimit();
+        if (!fanout) {
+            ScanWorkersActive().fetch_sub(1);
+        }
     }
-    for (auto& t : workers) {
-        t.join();
+    if (fanout) {
+        std::vector<std::thread> workers;
+        workers.reserve(subdirs.size());
+        for (size_t i = 0; i < subdirs.size(); ++i) {
+            workers.emplace_back([&, i] {
+                results[i] = scan_tree_parallel_impl(subdirs[i], depth + 1);
+            });
+        }
+        for (auto& t : workers) {
+            t.join();
+        }
+        ScanWorkersActive().fetch_sub(1);
+    } else {
+        for (size_t i = 0; i < subdirs.size(); ++i) {
+            results[i] = scan_tree_parallel_impl(subdirs[i], depth + 1);
+        }
     }
     for (auto& child : results) {
         if (child.size > 0) {

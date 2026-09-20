@@ -9,6 +9,7 @@ use std::ffi::OsStr;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{Receiver, channel};
 use std::thread;
 use std::time::Instant;
@@ -116,7 +117,20 @@ fn file_node(entry_path: PathBuf, size: u64) -> Option<Node> {
     }
 }
 
+static SCAN_ACTIVE: AtomicUsize = AtomicUsize::new(0);
+
+fn worker_limit() -> usize {
+    4 * std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(2)
+        .max(2)
+}
+
 fn scan_tree_parallel(path: &Path) -> Node {
+    scan_tree_parallel_impl(path, 0)
+}
+
+fn scan_tree_parallel_impl(path: &Path, depth: usize) -> Node {
     let mut node = Node {
         path: path.to_path_buf(),
         size: 0,
@@ -178,23 +192,44 @@ fn scan_tree_parallel(path: &Path) -> Node {
         }
     }
 
-    thread::scope(|s| {
-        let mut handles = Vec::new();
-        for sub in subdirs {
-            handles.push(s.spawn(move || scan_tree_parallel(&sub)));
+    // Capped fan-out like the C++ port: uncapped spawning drowned the
+    // gains on warm cache (bench: 0.97x).
+    let mut fanout = !subdirs.is_empty() && depth < 64;
+    if fanout {
+        let was = SCAN_ACTIVE.fetch_add(1, Ordering::SeqCst);
+        fanout = was < worker_limit();
+        if !fanout {
+            SCAN_ACTIVE.fetch_sub(1, Ordering::SeqCst);
         }
-        for h in handles {
-            match h.join() {
-                Ok(child) => {
-                    if child.size > 0 {
-                        node.size += child.size;
-                        node.children.push(child);
+    }
+    if fanout {
+        thread::scope(|s| {
+            let mut handles = Vec::new();
+            for sub in subdirs {
+                handles.push(s.spawn(move || scan_tree_parallel_impl(&sub, depth + 1)));
+            }
+            for h in handles {
+                match h.join() {
+                    Ok(child) => {
+                        if child.size > 0 {
+                            node.size += child.size;
+                            node.children.push(child);
+                        }
                     }
+                    Err(_) => eprintln!("scan thread panicked; subtree dropped"),
                 }
-                Err(_) => eprintln!("scan thread panicked; subtree dropped"),
+            }
+        });
+        SCAN_ACTIVE.fetch_sub(1, Ordering::SeqCst);
+    } else {
+        for sub in subdirs {
+            let child = scan_tree_parallel_impl(&sub, depth + 1);
+            if child.size > 0 {
+                node.size += child.size;
+                node.children.push(child);
             }
         }
-    });
+    }
     node
 }
 
@@ -276,17 +311,30 @@ fn squarify(nodes: &mut [Node], rect: Rect) {
     }
 }
 
-// Owned subtree in, laid-out subtree out. Join failures are reported and
-// the subtree is dropped (equivalence tests would catch any divergence).
-fn layout_subtree_parallel(mut node: Node) -> Node {
+// Owned subtree in, laid-out subtree out. Deeper levels stay serial:
+// unbounded fan-out at every level cost more than it saved (bench).
+fn layout_subtree_parallel(mut node: Node, depth: usize) -> Node {
     if node.is_dir && !node.children.is_empty() && node.rect.w > 4.0 && node.rect.h > 4.0 {
-        squarify_parallel(&mut node.children, node.rect);
+        squarify_parallel_depth(&mut node.children, node.rect, depth + 1);
     }
     node
 }
 
 fn squarify_parallel(nodes: &mut Vec<Node>, rect: Rect) {
+    squarify_parallel_depth(nodes, rect, 0);
+}
+
+fn squarify_parallel_depth(nodes: &mut Vec<Node>, rect: Rect, depth: usize) {
     squarify_level(nodes, rect);
+    if depth > 0 {
+        // Serial recursion below the top level (see above).
+        for node in nodes.iter_mut() {
+            if node.is_dir && !node.children.is_empty() && node.rect.w > 4.0 && node.rect.h > 4.0 {
+                squarify_parallel_depth(&mut node.children, node.rect, depth + 1);
+            }
+        }
+        return;
+    }
     thread::scope(|s| {
         let taken = std::mem::take(nodes);
         let mut handles = Vec::new();
@@ -298,7 +346,7 @@ fn squarify_parallel(nodes: &mut Vec<Node>, rect: Rect) {
                 && child.rect.w > 4.0
                 && child.rect.h > 4.0
             {
-                handles.push(s.spawn(move || layout_subtree_parallel(child)));
+                handles.push(s.spawn(move || layout_subtree_parallel(child, depth)));
             } else {
                 out.push(child);
             }
