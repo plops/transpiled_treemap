@@ -21,7 +21,7 @@ target_include_directories(treemap_cpp PRIVATE src)
 target_link_libraries(treemap_cpp PRIVATE pthread)
 
 add_executable(core_tests tests/core_tests.cpp)
-target_include_directories(core_tests PRIVATE src)
+target_include_directories(core_tests PRIVATE src third_party)
 target_link_libraries(core_tests PRIVATE pthread)
 
 enable_testing()

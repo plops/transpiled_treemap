@@ -7,6 +7,7 @@
 #include "010_scanner.hpp"
 #include "015_color.hpp"
 #include "020_layout.hpp"
+#include "030_pge_app.hpp"
 
 namespace fs = std::filesystem;
 
@@ -67,6 +68,30 @@ int main() {
     check(missing.size == 0 && missing.children.empty(), "missing dir empty, no crash");
 
     check(treemap::format_bytes(2048) == "2.0 KB", "format_bytes");
+
+    // Hover hit-test (030 shell): root rect assigned, deepest child wins.
+    // Regression: root.rect was never set, so every hover missed.
+    {
+        treemap::Node root;
+        root.rect = {0.0f, 36.0f, 800.0f, 564.0f};
+        treemap::Node a;
+        a.path = "a";
+        a.rect = {0.0f, 36.0f, 400.0f, 564.0f};
+        a.size = 1;
+        treemap::Node b;
+        b.path = "b";
+        b.rect = {400.0f, 36.0f, 400.0f, 564.0f};
+        b.size = 1;
+        root.children.push_back(a);
+        root.children.push_back(b);
+        const treemap::Node* h1 = treemap::pge::TreemapApp::find_hover(root, 600.0f, 300.0f);
+        check(h1 != nullptr && h1->path == "b", "hover hits right child");
+        const treemap::Node* h2 = treemap::pge::TreemapApp::find_hover(root, 10.0f, 10.0f);
+        check(h2 == nullptr, "hover outside root misses");
+        const treemap::Node* h3 = treemap::pge::TreemapApp::find_hover(root, 100.0f, 100.0f);
+        check(h3 != nullptr && h3->path == "a", "hover hits left child");
+    }
+
     fs::remove_all(base);
     std::cout << "all c++ core tests passed\n";
     return 0;

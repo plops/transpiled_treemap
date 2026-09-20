@@ -39,6 +39,7 @@ class TreemapApp : public olc::PixelGameEngine {
             Node root = scan_tree_parallel(m_target);
             const olc::vi2d screen = ScreenSize();
             const Rect canvas{0.0f, 36.0f, float(screen.x), float(screen.y - 36)};
+            root.rect = canvas;
             squarify_parallel(root.children, canvas);
             std::lock_guard lock(m_mutex);
             m_ready = std::move(root);
@@ -74,6 +75,20 @@ class TreemapApp : public olc::PixelGameEngine {
         return !m_stop;
     }
 
+    // Pure hit-test helper (public for unit tests): deepest node wins.
+    static const Node* find_hover(const Node& n, float x, float y) {
+        if (x < n.rect.x || y < n.rect.y || x > n.rect.x + n.rect.w ||
+            y > n.rect.y + n.rect.h) {
+            return nullptr;
+        }
+        for (const auto& ch : n.children) {
+            if (const Node* hov = find_hover(ch, x, y); hov != nullptr) {
+                return hov;
+            }
+        }
+        return &n;
+    }
+
   private:
     void draw_tree(const Node& n) {
         if (n.children.empty()) {
@@ -86,19 +101,6 @@ class TreemapApp : public olc::PixelGameEngine {
             draw_tree(ch);
         }
         draw.Rect({n.rect.x, n.rect.y}, {n.rect.w, n.rect.h}, olc::Pixel(0, 0, 0, 160));
-    }
-
-    static const Node* find_hover(const Node& n, float x, float y) {
-        if (x < n.rect.x || y < n.rect.y || x > n.rect.x + n.rect.w ||
-            y > n.rect.y + n.rect.h) {
-            return nullptr;
-        }
-        for (const auto& ch : n.children) {
-            if (const Node* hov = find_hover(ch, x, y); hov != nullptr) {
-                return hov;
-            }
-        }
-        return &n;
     }
 
     fs::path m_target;
