@@ -1,0 +1,39 @@
+ich moechte eine dokumentation der code experimente und software in diesem repo in plan/20260920_02_doc/doc.md abspeichern. erklaere die architektur der rust und c++ programme in iteration 1 und 2 (und die unterschiede). ich moechte dass das dokument auf github gut aussieht. bemerkung: GitHub Markdown kann sowohl mathematische Formeln als auch Flussdiagramme nativ anzeigen.
+GitHub verwendet dafür standardmäßig die Syntax von MathJax (für Mathematik) und Mermaid (für Diagramme). Sie müssen keine externen Plugins oder Bilder einfügen, sondern können den Code direkt in Ihre Markdown-Datei (.md) schreiben.
+Hier ist eine Übersicht, wie Sie beide Funktionen nutzen:
+1. Mathematische Formeln (MathJax)
+Sie können mathematische Symbole und Gleichungen entweder direkt im Text (Inline) oder als separaten Block anzeigen lassen. Nutzen Sie dafür das $-Zeichen.
+
+    Inline-Mathe: Setzen Sie die Formel zwischen zwei einzelne $-Zeichen.
+        Code: Die Formel lautet $E = mc^2$.
+    Block-Mathe: Setzen Sie die Formel in eine eigene Zeile zwischen jeweils zwei $$-Zeichen.
+        Code:
+        markdown
+
+        $$
+        \frac{a}{b} = c
+        $$
+
+        Use code with caution.
+
+2. Flussdiagramme (Mermaid)
+Um Diagramme zu erstellen, nutzen Sie einen normalen Code-Block (drei Backticks ```), schreiben aber das Wort mermaid als Sprachbezeichner direkt dahinter.
+Hier ist ein einfaches Beispiel für ein Flussdiagramm (Flowchart):
+markdown
+
+```mermaid
+graph TD
+    A[Start] --> B{Ist es GitHub?}
+    B -- Ja --> C[Mathe & Diagramme funktionieren!]
+    B -- Nein --> D[Anderen Editor nutzen]
+```
+
+Use code with caution.
+Kurze Übersicht der Mermaid-Grundlagen:
+
+    graph TD: Definiert die Richtung von oben nach unten (Top-Down). Nutzen Sie graph LR für eine Darstellung von links nach rechts (Left-Right).
+    -->: Erstellt einen einfachen Pfeil zwischen zwei Knoten.
+    Formen der Knoten:
+        Eckige Klammern A[Text] = Rechteck
+        Geschweifte Klammern B{Text} = Raute (für Entscheidungen)
+        Runde Klammern C(Text) = Abgerundetes Rechteck. wichtig in der dokumentation ist das konzept (und unterschiede in den implementierungen) der datenerhebung aber auch das layout der treemap.  schreibe das technische dokument auf deutsch. fuer die wahl der parallelisierung wurden benchmarks durchgefuehrt (siehe die walkthrough dokumente und benchmark reports). falls noetig kannst du auch nocheinmal selbst benchmarks durchfuehren. haben sich die initialen annahmen aus den ersten benchmarks bestaetigt? sind die implementierungen performant fuer grosse dateisysteme oder sollte man die architektur nocheinmal ueberabeiten?  falls dir diagramme oder text themen auffallen die gut mit in die technische dokumentation passen schlage diese vor und setze sie um. schreibe das aktuelle prompt als prompt.txt in plan/20260920_02_doc und committe gelegentlich. am ende der dokumentationsarbei schreibe ein walkthrough.md dokument in plan/20260920_02_doc (dort sollen deine experimente, learnings, die quellen aufgelistet und dokumentiert werden)
