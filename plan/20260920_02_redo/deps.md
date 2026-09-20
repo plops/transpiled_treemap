@@ -1,4 +1,4 @@
-# deps.md — Abhängigkeiten (20260920_02_redo, Stand 2026-09-20, Planung)
+# deps.md — Abhängigkeiten (20260920_02_redo, Stand 2026-09-20, final)
 
 Vorgabe: Code und Deps minimal halten; neue Deps nur mit Messbeleg.
 Bei Neueinführung: neueste Version nehmen (auch bei
@@ -11,7 +11,7 @@ deepwiki-Spalte hält Abfrageschlüssel für später vor. Lokaler Ersatz:
 
 | Crate / Tool | Stand (20.09., zu bestätigen) | Verwendet in (iter2) | GitHub-Org/Repo | deepwiki-Vorschlag |
 |---|---|---|---|---|
-| `macroquad 0.4` | Lock-Stand Iter1: `0.4.16`; `cargo search` heute: `0.4.16` = newest | Rust seriell + parallel (Fenster/Input) | `not-fl3/macroquad` | `not-fl3/macroquad` |
+| `macroquad 0.4` | `cargo search` 20.09.: `0.4.16` = newest = Lock-Stand → kein Update | Rust seriell + parallel (Fenster/Input) | `not-fl3/macroquad` | `not-fl3/macroquad` |
 | `miniquad 0.4` (transitiv) | transitiv | Rust GUI (transitiv) | `not-fl3/miniquad` | `not-fl3/miniquad` |
 | `sbcl` 2.6.0.debian | System | `lisp/gen.lisp`-Lauf | — | — |
 | `cl-cpp-generator2` (Quicklisp-Local) | Tooling | C++-Generierung (nur iter2-Core) | `plops/cl-cpp-generator2` | `plops/cl-cpp-generator2` |

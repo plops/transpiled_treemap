@@ -1,7 +1,10 @@
-# Build outputs must never be committed (Rust target/, CMake build dirs).
+# Build outputs must never be committed (Rust target/, CMake build dirs,
+# transpiler staging dir — cpp/gen/ IS committed as review artifact).
 /target/
+iter2/target/
 cpp/build/
 build/
+iter2/lisp/gen/
 # Transient editor and backup files.
 *~
 *.known-good
