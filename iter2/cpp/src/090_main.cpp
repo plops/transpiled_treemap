@@ -4,9 +4,11 @@
 #include <cstdio>
 #include <iostream>
 
-#include "010_scanner.hpp"
-#include "015_color.hpp"
-#include "020_layout.hpp"
+// Angle brackets on purpose (see 030_pge_app.hpp): the USE_GENERATED
+// build must resolve these via -I to cpp/gen/, not to this directory.
+#include <010_scanner.hpp>
+#include <015_color.hpp>
+#include <020_layout.hpp>
 
 namespace {
 

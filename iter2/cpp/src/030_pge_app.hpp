@@ -10,9 +10,12 @@
 #include <string>
 #include <thread>
 
-#include "010_scanner.hpp"
-#include "015_color.hpp"
-#include "020_layout.hpp"
+// Angle brackets on purpose: quoted includes would resolve to this file's
+// own directory (src/) even in the USE_GENERATED build. Brackets honor
+// the -I order, so the gen build picks up cpp/gen/ core headers.
+#include <010_scanner.hpp>
+#include <015_color.hpp>
+#include <020_layout.hpp>
 
 namespace treemap::pge {
 

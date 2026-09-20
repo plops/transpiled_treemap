@@ -8,6 +8,7 @@
 // hazard class from rust_cpp_vergleich.md, item 5).
 #pragma once
 
+#include <algorithm>
 #include <atomic>
 #include <cstdint>
 #include <filesystem>
@@ -166,7 +167,7 @@ inline std::atomic<unsigned>& ScanWorkersActive()
 
 inline unsigned ScanWorkerLimit()
 {
-    const unsigned hw = std::thread::hardware_concurrency();
+    const unsigned        hw    = std::thread::hardware_concurrency();
     static const unsigned limit = 4u * (hw == 0 ? 2u : std::max(2u, hw));
     return limit;
 }
